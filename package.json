@@ -1,0 +1,19 @@
+{
+  "name": "unit-testing",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "slidev build",
+    "dev": "slidev --open",
+    "export": "slidev export"
+  },
+  "dependencies": {
+    "@jest/types": "^29.6.3",
+    "@slidev/cli": "^51.7.1",
+    "@slidev/theme-default": "latest",
+    "@slidev/theme-seriph": "latest",
+    "@types/jest": "^29.5.14",
+    "jest": "^29.7.0",
+    "vue": "^3.5.14"
+  }
+}
