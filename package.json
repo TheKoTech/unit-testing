@@ -5,6 +5,7 @@
   "scripts": {
     "build": "slidev build",
     "dev": "slidev --open",
+    "host": "serve ./dist",
     "export": "slidev export"
   },
   "dependencies": {
@@ -15,5 +16,8 @@
     "@types/jest": "^29.5.14",
     "jest": "^29.7.0",
     "vue": "^3.5.14"
+  },
+  "devDependencies": {
+    "serve": "^14.2.4"
   }
 }
