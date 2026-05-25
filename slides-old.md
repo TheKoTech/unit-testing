@@ -12,6 +12,8 @@ mdc: true
 # seoMeta:
 #  ogImage: https://cover.sli.dev
 layout: center
+fonts:
+  mono: JetBrainsMono Nerd Font
 ---
 
 <h1 class="text-green-400">Зачем писать юнит тесты?</h1>
@@ -35,7 +37,7 @@ layout: center
 <!--
 Я считаю, что тесты нужны для защты от регрессий. Написали интеграционный тест на Ордере, чтобы быть уверенными, что всегда можно заказать такси - тест провалится, когда разработчик сломает эту функциональность, непрохождение теста это сигнал о возможной регрессии.
 
-Чем больше кода, тем сложнее писать новое, не ломая старое, тем больше регрессий. Самый большой и сложный наш проект - ордер. И именно на нём это и проявляется - исправляем один баг, появляется два других.
+Чем больше кода, тем сложнее писать новое, не ломая старое, тем больше регрессий. На ордере исправляем один баг, и появляется два других.
 
 Из этого я сам делаю вывод, что тесты мы пишем для себя же, чтобы по мере написания кода можно было отследить регрессии и не позволить им попасть в прод. Именно для разработчика, потому что именно он пишет код, он же пишет тесты, и он смотрит на результаты прогона раннера.
 
@@ -47,131 +49,86 @@ layout: center
 <img class="h-90% mx-auto" src="/test-types.png" />
 
 <!--
-Давайте я постараюсь быстренько выдать "теорию", чтоб мы могли уже обсуждать конкретные примеры.
-
-Тесты можно охарактеризовать 3 параметрами
+Тесты можно охарактеризовать 4 параметрами. Один из них не на картинке, про него чуть позже.
 
 - Насколько тест устойчив к рефакторингу
 - Как хорошо он защищает от багов
 - Как быстро отрабатывает
+- И простота поддержки. Она зависит только от навыка. Микровывод - если ваши тесты тяжело поддерживать, у вас просто проблема с навыком.
 
-В центр этой диаграммы мы никогда не попадём. Просто нет таких инструментов. Всегда придётся чем-то жертвовать.
+Шутки в сторону. В центр этой диаграммы мы никогда не попадём. Просто нет таких инструментов. Всегда придётся чем-то жертвовать.
 
-Интеграционные или сквозные тесты долгие, но покрывают кучу кода. Мы не мокаем ничего внутри самого проекта, он должен работать так же, как на проде, поэтому каждое действие в интеграционном тесте может затронуть с десяток файлов. Интеграционные тесты жертвуют временем.
+Интеграционные и сквозные тесты жертвуют время. Если проход 700 юнитов занимает 10 секунд, то прогон 70 playwright тестов занимает минут 15. Но при этом интеграционные тесты проходят почти любой рефакторинг, потому что не сильно привязаны к коду, в бонус к этому они покрывают колоссальное количество кода. Какой-нибудь клик по кнопке submit на форме заказа проходит через десяток-другой файлов от HTML шаблона до HTTP запроса, да ещё и проверяет не только наш код, но ещё и фреймворк и браузер. Это был бы идеальный тест, только вот. Из-за того что они такие медленные, их нельзя держать запущенными на каждое изменение в коде, вместо этого мы запускаем их под самый конец, когда уже всё готово и поверхностно проверенно руками. А вот с юнит тестами можно, например, делать Test driven development, когда параллельно разработке держится окошко с юнитами и срабатывают на каждое изменение.
 
-Хрупкие тесты - это тесты, которые ломаются на каждый чих. Если тест сломается, потому что мы переименовали тестируемый метод - тест хрупкий.
-
-Тривиальные тесты - это тесты, которые не защищают от багов. Пустышки.
+Далее. Если мы максимизируем устойчивость к рефакторингу и скорость, то получаем "тривиальный" тест.
 -->
 
 ---
-
-````md magic-move {lines:true}
-```ts {all|15-23|all}
-class MenuFacade {
-  private readonly snackbarService = inject(SnackbarService);
-
-  openSnackbar(msg: string, options: SnackbarOptions): void {
-    snackbarService.showSnackbar(msg, options)
-  }
-}
-
-describe('MenuFacade', () => {
-  let facade: MenuFacade
-  let snackbarService: SnackbarService
-
-  beforeEach(() => { /* ... */ })
-
-  // пробрасывает аргументы
-  it('passes arguments', () => {
-    const msg = 'test message'
-    const options = { duration: 3000 }
-
-    facade.openSnackbar(msg, options)
-
-    expect(snackbarService.showSnackbar).toHaveBeenCalledOnceWith(msg, options)
-  })
-})
-```
-
-```ts {all|10-15|all}
-class SomeService {
-  someField = true
-}
-
-describe('SomeService', () => {
-  let service: SomeService
-
-  beforeEach(() => { /* ... */ })
-
-  // пробрасывает аргументы
-  it('passes arguments', () => {
-    service.someField = false
-
-    expect(service.someField).toBe(false)
-  })
-})
-```
-````
-
-<!--
-Тривиальный тест это тест на метод фасада. [click] Проверяем, что буквально аргументы проброшены дальше. [click:2] Или проверяем, что публичное поле компонента хранит то, что мы в него записали. [click] Абсурд. Это никому не помогает. Нет логики, и негде ошибиться. Такие тесты скорее вредны, потому что занимают те 20 миллисекунд для прогона, 5 минут на написание, а вот пользы от них нет. Они не поймают баг.
--->
-
----
-
-````md magic-move {lines:true}
-```ts {all|13-15|all}
-class MenuFacade {
-  private readonly snackbarService = inject(SnackbarService);
-
-  openSnackbar(msg: string, options: SnackbarOptions): void {
-    snackbarService.showSnackbar(msg, options)
-  }
-}
-
-describe('MenuFacade', () => {
-  it('passes arguments', () => {
-    const facade = new MenuFacade({ showSnackbar: () => {} } as any);
-
-    expect(String(facade.openSnackbar)).toBe(`function (msg, options) {
-      this.snackbarService.showSnackbar(msg, options);
-    }`);
-  });
-});
-```
 
 ```ts
-class MenuFacade {
-  private readonly snackbarService = inject(SnackbarService);
+describe('MenuFacade', () => {
+  let facade: MenuFacade;
+  let snackbarService: SnackbarService;
 
-  openSnackbar(message: string, options: SnackbarOptions): void {
-    snackbarService.showSnackbar(msg, options)
-  }
-}
+  beforeEach(() => { /* ... */ });
+
+  // пробрасывает аргументы
+  it('passes arguments', () => {
+    const msg = 'test message';
+    const options = { duration: 3000 };
+
+    facade.openSnackbar(msg, options);
+
+    expect(snackbarService.showSnackbar).toHaveBeenCalledOnceWith(msg, options);
+  });
+});
+```
+
+<!--
+Тривиальный тест это тест на метод фасада. Проверяем, что буквально аргументы проброшены. Или проверяем, что публичное поле компонента хранит то, что мы в него записали. Абсурд. Это никому не помогает. Нет логики, и негде ошибиться. Такие тесты скорее вредны, потому что занимают те 20 миллисекунд для прогона, 5 минут на написание, а вот пользы от них нет. Они не поймают баг.
+
+Далее, что будет если мы максимизируем скорость и защиту от багов?
+-->
+
+---
+
+```ts
+import { describe, it, expect } from 'vitest';
+import { MenuFacade } from './menu.facade';
 
 describe('MenuFacade', () => {
   it('passes arguments', () => {
     const facade = new MenuFacade({ showSnackbar: () => {} } as any);
 
     expect(String(facade.openSnackbar)).toBe(`function (msg, options) {
-      this.snackbarService.showSnackbar(msg, options);
+        this.snackbarService.showSnackbar(msg, options);
     }`);
   });
 });
+
 ```
-````
 
 <!--
-Хрупкий тест защищает от всех багов на 100%, при этом выполняется супер быстро. Эталонный хрупкий тест - это тест на корректную имплементацию метода. [click] Просто посимвольно сравниваем, что метод правильно написан
+Хрупкий тест защищает от всех багов на 100%, при этом выполняется супер быстро. Эталонный хрупкий тест - это тест на корректную имплементацию метода. Просто посимвольно сравниваем, что метод правильно написан
 
 И как бы технически он делает то, что мы хотим от теста - защищает от багов. Идеально. Ни один не пропустит.
 
-Я ещё не видел ни одного у нас теста, написанного так. Почему?
+Если тривиальных тестов у нас ещё полно, то вот ТАКИХ я ни одного у нас ещё не видел. Почему? Что нам нам мешает писать тесты так?
 
-Конкретно этот тест мы не станем писать, потому что он сломается, если мы заменим табы на пробелы или [click:2] переименуем msg на message. Да, тест поймает 100% багов. Но кроме этого он ещё сломается, если вы подышите в его сторону.
+Конкретно этот тест мы не станем писать, потому что он сломается, если мы заменим табы на пробелы или переименуем msg на message. Да, он поймает 100% багов. Но кроме этого он ещё сломается, если вы подышите в его сторону. Человек такая тварь, что если что-то постоянно не работает, то он просто забивает и перестаёт обращать внимание.
 
-Человек такая тварь, что если что-то постоянно не работает, то мы просто забиваем и перестаём обращать внимание. У нас на ордере постоянно падают интеграционные тесты. Я не могу забыть период, когда у нас они падали 100% времени, и мы просто не обращали на них внимание перед тем чтобы пушить код в продакшн. Флейки тесты то же самое. Они постоянно ломаются, и в какой-то момент станет похрен. Ну сломались и сломались. А по идее, это же сигнал о регрессии, и возможно какая-то функциональность работает через раз в самом приложении. Но мы забиваем, потому что ну тесты же проходят с пятого раза. С юнитами то же самое. Если они будут постоянно падать при любых изменениях, то мы просто на похрен починим его, там я не знаю, true на false в expect'е заменим, не задумываясь о том, правильно ли он вообще работал, правильно ли работает сейчас и как хорошо он написан.
+У нас на ордере постоянно падают интеграционные тесты. Что мы делаем, когда видим это? Машем рукой и думам "ну, флейки тесты наверное". Потому что они постоянно ломаются. А по идее, это же сигнал о регрессии, и возможно какая-то функциональность просто отвалилась, полностью. Но мы забиваем. Потому что тесты постоянно красные. С юнитами то же самое. Если они будут постоянно падать при любых изменениях, то мы просто на похрен починим его, там я не знаю, true на false в expect'е заменим, не задумываясь о том, правильно ли он вообще работал, правильно ли работает сейчас и как хорошо он написан.
+-->
+
+---
+
+<img class="h-90% mx-auto" src="/test-params.png" />
+
+
+<!--
+Опять же, в первую очередь, тесты должны быть написаны для нас, разработчиков. Мы их читаем, их пишем, исправляем, если они падают. Мы получаем тот самый сигнал о том, что появилась возможная регрессия. А это значит, что тесты нужно писать так, чтобы они не ломались при рефакторинге, желательно никогда. А вот по скорости работы и количеству покрытого кода мы уже можем выбирать, и выбираем из двух крайностей - юниты или интеграционные.
+
+Простота поддержки и устойчивость к рефакторингу это те метрики, без которых тесты бесполезны. И именно от них зависит, насколько быстро нам станет похрен на очередной красный пайплайн на гитлабе. Поэтому ими жертвовать нельзя ни в коем случае.
 -->
 
 ---
@@ -186,7 +143,7 @@ layout: center
 
 <h1 class="text-green-400">Что такое юнит тест?</h1>
 
-<div v-click="1">
+<div v-mark.red.box="3" v-click="1">
   <div class="text-white">Это автоматизированный тест, который:</div>
 
   <ul>
@@ -196,10 +153,56 @@ layout: center
   </ul>
 </div>
 
-<!--
-Различие юнитов от интеграционных. 
+<div class="pt-3" v-click="2">
+  По классической школе:
 
-[click] Юниты проверяют правильность работы одной единицы поведения - юнита. Мокирует все импортируемые классы/зависимости. Работает быстро.
+  <ul>
+    <li> Проверяет правильность работы одной единицы поведения — юнита</li>
+    <li> Изолирует каждый тест друг от друга</li>
+    <li> Работает быстро</li>
+  </ul>
+</div>
+
+<!-- v-mark doesn't create a click for some reason wtf -->
+<div v-click="3"></div>
+
+<!--
+Я уже всё это вам говорил, но освежить термины стоит.
+
+[click] Это автоматизированный тест, который:
+
+- Проверяет правильность работы одного юнита. Юнит — это единица поведения, что-то, что можно описать простым языком не-программисту. Единица поведения не зависит от кода, имплементации. Она может покрывать метод-однострочник или класс целиком, а может даже несколько классов.
+
+- Изолирует тестируемый класс — означает, что "реальным" во время теста будет только тестируемая система. Внешние зависимости: базы данных, API, используемые или инъектируемые сервисы - заменяются заглушками. Константы типа строк, enum'ов заменять не нужно, но можно, если это полезно для теста, например, конфиги или переменные окружения.
+
+- Быстро — если вас всё устраивает, то работает быстро.
+
+[click] Также есть классическая школа тестирования. Разница в подходах в том, как определяется "изоляция". Для лондонской, как я и сказал, изолируется класс, остальное мокируем. В классической изолируются тесты между собой.
+
+На фронте или, по крайней мере, для Angular, пишут по лондонской, которая выше. Я думаю, это связано с ограничениями тестовых фреймворков, ведь большинство раннеров работают в ноде, поэтому не получается заменять все зависимости, в ноде нельзя просто взять и запустить проект на ангуляре.
+
+По классической, мокируется минимум зависимостей, только внепроцессные типа API, баз данных, файловой системы и сторонних сервисов пишут заглушки. Такой подход приводит к тестам, которые покрывают значительно больше кода, лучше защищают от багов, но и у них есть свои недостатки. Я слышал, что такой подход хорошо применим к бэку, особенно в Максиме, так как у нас постоянно делят функциональность на отдельные сервисы.
+
+[click] Я буду говорить и показывать примеры, по большей части, по лондонской школе, которую используют во фронте, но я постарался сделать так, чтобы для бэка это тоже было полезно. Вы же пишете тесты, да? Так ведь?
+-->
+
+---
+layout: center
+class: p-60
+---
+
+Если падает тест, то можно точно понять, в каком классе и какая функциональность сломалась
+
+<br>
+
+Тестами легко покрыть сложный граф зависимостей, так как все зависимости мокируются
+
+<!--
+Итак, из пунктов выше о лондонской школе, вытекает, что:
+
+- Если тест падает, то можно точно понять, в каком месте, каком классе и какой конкретный функционал сломался. Это потому, что мы тестируем только один класс за раз. Для классической школы это не обязательно, так как зависимости не мокируются, и ошибки в соседних классах приведут к провалам везде и всюду.
+
+- Тестами легко покрыть сложный граф зависимостей, так как "реальным" остаётся только один класс. Всё остальное всегда будет работать так, как вы это определили моками. Но вообще у вас не должно быть сложного графа зависимостей. Если это так, то, как будто, вы накосячили с архитектурой. Классическая школа, где соседние классы не мокируются, укажет на эту проблему. Но, мы не можем использовать её на фронте, так что ндааа.
 -->
 
 ---
@@ -217,7 +220,15 @@ layout: center
 - Работает медленно
 
 <!--
-Интеграционные и сквозные тесты это тесты, которые будут ломать какие-то из правил для юнита. Медленные, не мокируют всё вокруг одного класса, и проверяют кучу разных единиц поведения.
+Кроме юнит тестов есть интеграционные. Интеграционным можно считать тест, который нарушает какой-либо из признаков юнит-теста.
+
+- Проверяем несколько единиц поведения
+- Изолирован от других тестов, но не мокирует всё вокруг одного класса. Он ИНТЕГРАЦИОННЫЙ, проверяет интеграцию разных частей программы.
+- Работает медленно
+
+Интеграционные тесты часто будут нарушать 2 или 3 пункта. Наирмер, тесты на playwright проверяют внешние зависимости типа Angular и библиотек, проверяют множество категорий кода от бизнес логики до отображения, даже конфиги, так как запускается проект.
+
+Не все интеграционные тесты проверяют несколько единиц поведения. Однако все интеграционные тесты проверяют, что разные компоненты системы слаженно работают между собой, и всегда покрывают огромное количество кода по сравнению с юнит тестами.
 -->
 
 ---
@@ -233,7 +244,9 @@ layout: center
 - Проверяют пользовательские сценарии целиком
 
 <!--
-Сквозные тесты это интеграционные тесты, которые могут не мокировать даже апишку.
+Вы также могли слышать про сквозные или end-to-end тесты. Интеграционные и сквозные тесты - не одно и то же, хотя у нас в команде этого разделения, обычно, не делают. С другой стороны, граница между ними не такая большая.
+
+Сквозной или end-to-end тест - это ещё более медленный интеграционный тест. Сквозные тесты могут работать с внешними зависимостями, типа API и баз данных. Они проверяют проект с точки зрения конечного пользователя.
 -->
 
 ---
@@ -242,442 +255,39 @@ layout: center
 
 <h1 class="text-green-400 pb-4">Что нужно тестировать?</h1>
 
-<ul>
-  <li><span v-mark.highlight.red="1">Бизнес логика</span></li>
-  <li>Инфраструктурный код</li>
-  <li>Связующий код</li>
-  <li>Внешние зависимости</li>
-  <li>Отображение на фронте</li>
-</ul>
+<ul v-click="1">
+  <li><span v-mark.highlight.red="6">Бизнес логика</span></li>
+  <li v-click="2">Инфраструктурный код</li>
+  <li v-click="3">Связующий код</li>
+  <li v-click="4">Внешние зависимости</li>
+  <li v-click="5">Отображение на фронте</li>
+</ul
 
+<!-- step 1 -->
 <!--
-Тесты писать долго и муторно, их нужно поддерживать, потому что они ломаются, плюс они усложняют рефакторинг и изменение функционала. Поэтмоу тестировать надо не всё подряд.
+Не всё нужно тестировать. Тестовый код, как и любой код, требует поддержки. Провели чистку - надо поправить тесты. Поменяли бизнес-логику - поменяли тесты, поменяли вёрстку - сломались тесты. Поэтому не весь код заслуживает, чтобы его тестировали. Покрытие в 100% не гарантирует 100% защиту от регрессий, более того, это титанический труд, особенно в больших кодовых базах. Тестировать нужно наиболее важные части проекта.
 
-Для бизнеса важно, чтобы приложение работало. Если сломается мелочь типа тёмной темы, мы много клиентов не потеряем. Если на сайте заказа такси нельзя заказать такси, мы теряем деньги.
+А что можно считать... ***важным***?
 
-[click] Поэтому в первую очередь тестируем БИЗНЕС ЛОГИКУ.
--->
+Сломается форма заказа, и пользователи не смогут приносить бизнесу деньги. Важно? Важно.
 
----
+В диалоговом окне за десятью кликами, куда никто не заходит, в инпуте текст перестанет быть выровнен по центру. Важно?
 
-<!--
-Достаточно теории. Я вам её уже в прошлый раз всю выдал, это так, напоминалка. Снова, все согласны?
--->
+Да, это крайности. На самом деле, конечно, *"важность"* кода это, скорее, градиент. Что-то важнее, что-то не очень.
 
----
+Давайте разделим код на условные "типы", чтобы было нагляднее:
 
-```yaml
-layout: center
-```
+- [click] Бизнес логика. Она либо приносит деньги, либо решает проблему пользователя, а значит этому функционалу нельзя ломаться.
 
-<img src="/playwright-err.png" />
+- [click] Инфраструктурный код. Настройки, конфиги, логирование. Стоит ли это тестировать? Некоторые логи важны, например, аналитика. Если она перестанет приходить, может нарушиться работа множества людей в компании. Однако аналитики могут подождать, а клиент ждать, пока мы пофиксим критический баг, не будет.
 
-<!--
-Теперь к примерам.
+- [click] Связующий код. Контроллеры, фасады, адаптеры. Важно? Может и важно. Почему бы и не написать тест на метод, который используется в 20 местах. Нарушение его работы может привести к ошибкам по всему проекту. Геттеры, сеттеры, методы-однострочники, которые просто пробрасывают данные дальше, наверное, тестировать не нужно.
 
-Я сразу скажу, что если вы попали в список моих анти-примеров не значит, что я ругаю вас за плохие тесты или что я считаю вас плохим программистом. Следующий пример будет от меня, и он, как мне кажется, ещё хуже. Все мы косячим, и никто из нас ещё не достиг уровня говнокода Влада или разработчиков ЭЛМА 365. Я о всех вас высокого мнения, ок?
+- [click] Внешние зависимости. Язык, фреймворк, библиотеки, файловая система, база данных, API. Вы можете поспорить, что они и так должны работать, и проверять их работу не надо. Может быть. А может быть обновление версии Ангуляра приведёт к тому, что перестанет работать смена языка, как это произошло на Бурлаке.
 
-Я запускаю playwright на mini-app и вижу это. Выглядит понятно, не пробрасываются данные в expect. Хорошо.
--->
+- [click] Отображение. Применимо только к фронту. Обычно код для отображения примитивен. Наверное, не стоит проверять, если отображается параграф текста, статически заданный в вёрстке компонента. Наверное. С другой стороны, именно вёрстка это то, с чем взаимодействует пользователь в первую очередь.
 
----
-
-```yaml
-layout: center
-```
-
-```ts {all|75|66-76|all|109|126|140|154|169|186|200|227|241|255|274|286|109,126,140,154,169,186,200,227,241,255,274,286|60}{lines:true,startLine:55,maxHeight:'500px'}
-test(
-  CalculateOrderDescription.CHANGE_ORDER_PARAMETERS,
-  async ({ page, storage }) => {
-    // arrange
-    let requestCount = 0;
-    const expectedRequestCount = 16; // Есть дублирующие запросы, идеальный результат 14
-    const base = getBaseMock({
-      id: 1,
-    });
-    const calculateUrl = `https://dev-mos.taximaxim.ru/calculate?base=${base.id}`;
-
-    const expectCalculateRequest = async (
-      expected: Partial<CalculateRequest>
-    ): Promise<void> => {
-      const waitForCalculate = page.waitForRequest((req) => {
-        return req.url().startsWith(calculateUrl) && req.method() === 'POST';
-      });
-      const data = (await waitForCalculate).postDataJSON();
-      expectedCalculate.uid = data.uid;
-
-      expect(data).toMatchObject(expected);
-    };
-
-    const expectedCalculate: Partial<CalculateRequest> = {
-      uid: null,
-      addresses: [{ coordinates: addressList[0].coordinates }],
-      tariffTypes: [tariffTypes[0].id],
-      addPrices: [],
-      orderId: null,
-      startTime: null,
-    };
-
-    // Request counter
-    page.on('request', (request) => {
-      if (request.url().includes(calculateUrl)) requestCount++;
-    });
-
-    // arrange: storage
-    await storage.predefine([{ key: StorageKey.BASE, value: base }]);
-
-    // act
-    await page.goto('/');
-
-    // act: preconditions check
-    expect(await isGeolocationGranted(page)).toBe(false);
-
-    // act: create order
-    // act: select addresses
-    await page.getByRole('button').filter({ hasText: 'Куда поедете' }).click();
-    await page
-      .getByRole('button')
-      .filter({ hasText: 'Скажу водителю' })
-      .click();
-
-    await expectCalculateRequest(expectedCalculate);
-
-    // act: change first address to
-    await page
-      .getByRole('button')
-      .filter({ hasText: 'Скажу адрес водителю' })
-      .click();
-    await page.getByPlaceholder('Введите адрес для поиска').fill('Пушкина');
-
-    expectedCalculate.addresses!.push({
-      coordinates: addressList[2].coordinates,
-    });
-    await Promise.all([
-      page
-        .getByRole('listitem')
-        .filter({ hasText: addressList[2].title! })
-        .click(),
-      expectCalculateRequest(expectedCalculate),
-    ]);
-
-    // act: change address from
-    await page.getByRole('button').filter({ hasText: 'Ленина, 1' }).click();
-
-    expectedCalculate!.addresses![0] = {
-      coordinates: addressList[3].coordinates,
-    };
-    await Promise.all([
-      page
-        .getByRole('listitem')
-        .filter({ hasText: addressList[3].title! })
-        .click(),
-      expectCalculateRequest(expectedCalculate),
-    ]);
-
-    // act: add second address to
-    await page.getByTestId('add-address-btn').click();
-
-    expectedCalculate.addresses!.push({
-      coordinates: addressList[1].coordinates,
-    });
-    await Promise.all([
-      page
-        .getByRole('listitem')
-        .filter({ hasText: addressList[1].title! })
-        .click(),
-      expectCalculateRequest(expectedCalculate),
-    ]);
-
-    // act: select payment
-    await page.getByTestId('payment-card').click();
-    const paymentDialog = page
-      .getByRole('dialog')
-      .filter({ hasText: 'Способы оплаты' });
-    await expect(paymentDialog).toBeVisible();
-
-    await Promise.all([
-      paymentDialog
-        .getByRole('button')
-        .filter({ hasText: 'Перевод на сбербанк' })
-        .click(),
-      expectCalculateRequest(expectedCalculate),
-    ]);
-
-    await expect(paymentDialog).toBeHidden();
-
-    // act: select tariff
-    await page.getByTestId('tariffs-card').click();
-    const tariffDialog = page.getByRole('dialog').filter({ hasText: 'Такси' });
-    await expect(tariffDialog).toBeVisible();
-
-    await tariffDialog.getByRole('button').filter({ hasText: 'Такси' }).click();
-    // переключаем на другую группу тарифов, при этом очищается tariffTypes
-    expectedCalculate.tariffTypes = [];
-
-    // act: select first tariff types
-    expectedCalculate.tariffTypes.push(tariffTypes[2].id);
-    await Promise.all([
-      expectCalculateRequest(expectedCalculate),
-      tariffDialog
-        .getByRole('listitem')
-        .filter({ hasText: tariffTypes[2].name })
-        .click(),
-    ]);
-
-    // act: select second tariff types
-    expectedCalculate.tariffTypes.push(tariffTypes[3].id);
-    await Promise.all([
-      tariffDialog
-        .getByRole('listitem')
-        .filter({ hasText: tariffTypes[3].name })
-        .click(),
-      expectCalculateRequest(expectedCalculate),
-    ]);
-
-    await tariffDialog
-      .getByRole('button')
-      .filter({ hasText: 'Готово' })
-      .click();
-    await expect(tariffDialog).toBeHidden();
-
-    // act: select tariff options
-    await page.getByTestId('tariff-options-card').click();
-    const tariffOptionsDialog = page
-      .getByRole('dialog')
-      .filter({ hasText: 'Детали заказа' });
-    await expect(tariffOptionsDialog).toBeVisible();
-
-    const addPrice1 = tariffOptionsDialog
-      .getByRole('listitem')
-      .filter({ hasText: tariffOptions[0].name });
-
-    expectedCalculate.addPrices!.push({
-      value: '1',
-      id: tariffOptions[0].id,
-      key: tariffOptions[0].type,
-    });
-    await Promise.all([
-      addPrice1.getByTestId('ui-switch').click(),
-      expectCalculateRequest(expectedCalculate),
-    ]);
-
-    const addPrice2 = tariffOptionsDialog
-      .getByRole('listitem')
-      .filter({ hasText: tariffOptions[1].name });
-
-    expectedCalculate.addPrices!.push({
-      value: '5',
-      id: tariffOptions[1].id,
-      key: tariffOptions[1].type,
-    });
-    await Promise.all([
-      addPrice2.getByRole('textbox').fill('5'),
-      expectCalculateRequest(expectedCalculate),
-    ]);
-
-    const addPrice3 = tariffOptionsDialog
-      .getByRole('listitem')
-      .filter({ hasText: tariffOptions[2].name });
-
-    expectedCalculate.addPrices!.push({
-      value: 'Example',
-      id: tariffOptions[2].id,
-      key: tariffOptions[2].type,
-    });
-    await Promise.all([
-      addPrice3.getByRole('textbox').fill('Example'),
-      expectCalculateRequest(expectedCalculate),
-    ]);
-
-    const addPrice4 = tariffOptionsDialog
-      .getByRole('listitem')
-      .filter({ hasText: tariffOptions[3].name });
-    await addPrice4.getByTestId('ui-switch').click();
-    const targetVariant = addPrice4.locator(
-      `label:has-text("${tariffOptions[3].variants[1].value}")`
-    );
-    await expect(targetVariant).toBeEnabled();
-
-    expectedCalculate.addPrices!.push({
-      value: tariffOptions[3].variants[1].key,
-      id: tariffOptions[3].id,
-      key: tariffOptions[3].type,
-    });
-    await Promise.all([
-      targetVariant.click(),
-      expectCalculateRequest(expectedCalculate),
-    ]);
-
-    await page
-      .getByPlaceholder('Введите дополнительную информацию...')
-      .fill('test description');
-
-    await Promise.all([
-      tariffOptionsDialog
-        .getByRole('button')
-        .filter({ hasText: 'Готово' })
-        .click(),
-      expectCalculateRequest(expectedCalculate),
-    ]);
-
-    await expect(tariffOptionsDialog).toBeHidden();
-
-    // assert
-    expect(requestCount).toEqual(expectedRequestCount);
-  }
-);
-```
-
-<!--
-Открываю тест [click] Смотрю 75 строку. [click] В блоке вот этой функции. Она ждёт запрос на `/calculate`. [click] Внутри теста.
-
-[click] Тест может ломаться здесь.
-
-[click:12] 12 вызовов. Один из них ломается. Вот они все по файлу. Я добавил debounce на запрос, и убрал дубликаты. Вопрос знатокам, какой из 12 вызовов сломался?
-
-[click] Напоминаю, кстати, что запросов должно быть 16. Вызовов 12.
--->
-
----
-
-<img class="h-100% mx-auto" src="./diff.png" />
-
-<!--
-Просто чтобы отдебажить этот тест, мне пришлось рассыпать console.log'и буквально после каждой строки.
-
-С этим тестом крайне тяжело работать.
--->
-
----
-
-<img class="mx-auto" src="./act.png" />
-
-<!--
-12 вхождений комментария act. Это только комментарий, там ближе к концу просто комменты уже потерялись, мне кажется.
-
-В итоге я потратил на исправление одного теста часов 5, но уже не помню.
-
-Что мы можем с этим сделать? 
-
-...Мы придерживаемся паттерна ААА. Arrange, Act, Assert. В юнит тестах мы делаем строгий лимит на 1 блок act, и только изредка допускаем больше одного вызова в нём. Да, интеграционные тесты не обязаны иметь ровно один блок act. Но это же пиздец.
--->
-
----
-
-```yaml
-layout: center
-```
-
-```ts {all|12-48|50-52|2-10|12-20|21-25|all}{lines:true,maxHeight:'500px'}
-describe('should assign correct src path', () => {
-  interface TestData {
-    isDarkTheme?: boolean;
-    isCrimea?: boolean;
-    expectedTheme?: string;
-    actualLocale?: string;
-    expectedLocale?: string;
-    actualStore?: AppLinkStore;
-    expectedStore?: AppLinkStore;
-  }
-
-  function test({
-    isDarkTheme = false,
-    isCrimea = false,
-    expectedTheme = 'light',
-    actualLocale = 'en',
-    expectedLocale = 'en',
-    actualStore = AppLinkStore.GOOGLE_PLAY,
-    expectedStore = AppLinkStore.GOOGLE_PLAY,
-  }: TestData): void {
-    // arrange
-    setAppLinks({
-      appLinks: { [actualStore]: '' },
-      region: isCrimea ? AppLinkRegion.CRIMEA : AppLinkRegion.GLOBAL,
-    });
-    const actual: Badge[][] = [];
-    const appConfig: Partial<AppConfig> = { locale: 'ru', localeIr: 'ir' };
-
-    TestBed.overrideProvider(LOCALE_ID, { useValue: actualLocale });
-    TestBed.overrideProvider(APP_CONFIG_TOKEN, { useValue: appConfig });
-    TestBed.overrideProvider(IS_DARK_THEME$, { useValue: of(isDarkTheme) });
-
-    service = TestBed.inject(BadgeService);
-
-    // act
-    service
-      .getBadgesByCountry(getMockedCountry({ code: 'ru' }))
-      .pipe(tap((b) => actual.push(b)))
-      .subscribe();
-    tick(2000);
-
-    // assert
-    expect(actual.length).toEqual(1);
-    expect(actual[0].length).toEqual(1);
-    expect(actual[0][0].src).toEqual(
-      `assets/img/${expectedTheme}/app-link-${expectedStore}-${expectedLocale}.svg`
-    );
-  }
-
-  it('for ru locale', fakeAsync(() => {
-    test({ actualLocale: 'ru', expectedLocale: 'ru' });
-  }));
-
-  it('for ir locale', fakeAsync(() => {
-    test({ actualLocale: 'ir', expectedLocale: 'ir' });
-  }));
-
-  it('for wrong locale', fakeAsync(() => {
-    test({ actualLocale: 'asdfadf', expectedLocale: 'en' });
-  }));
-
-  it('for en locale', fakeAsync(() => {
-    test({ actualLocale: 'en', expectedLocale: 'en' });
-  }));
-
-  it('for dark theme', fakeAsync(() => {
-    test({ isDarkTheme: true, expectedTheme: 'dark' });
-  }));
-
-  it('for light theme', fakeAsync(() => {
-    test({ isDarkTheme: false, expectedTheme: 'light' });
-  }));
-
-  it('for google play', fakeAsync(() => {
-    test({
-      actualStore: AppLinkStore.GOOGLE_PLAY,
-      expectedStore: AppLinkStore.GOOGLE_PLAY,
-    });
-  }));
-
-  it('for apk', fakeAsync(() => {
-    test({
-      actualStore: AppLinkStore.APK,
-      expectedStore: AppLinkStore.APK,
-    });
-  }));
-
-  it('for AppStore', fakeAsync(() => {
-    test({
-      actualStore: AppLinkStore.APP_STORE,
-      expectedStore: AppLinkStore.APP_STORE,
-    });
-  }));
-});
-```
-
-<!--
-Теперь покажу вам, какую прелесть я вот этими руками написал. Я попрошу вас вчитаться в тест и понять его смысл. Контекст - это сервис, который формирует массив бейджиков для скачивания приложения.
-
-[click] глобальная моя идея была в том, что я один раз напишу мега-функцию `test()`
-
-[click] а потом переиспользовать её для конкретных параметров
-
-[click] Итак. Сначала определяем, какие могут быть входные параметры. Все с вопросиками, всё опциональное.
-
-[click] Те же параметры разворачиваем и определяем дефолтные.
-
-[click] setAppLinks ...
+Напоминаю, что покрывать 100% кода - не вариант. Это слишком времязатратно и не принесёт достаточной пользы. Код во всех этих категориях может быть важен. Но не равноценно. [click] Как ни крути, бизнес логика всегда должна стоять на первом месте. Мы в первую очередь должны убедиться, что задача пользователя решена, что он не заплатит лишний раз за второе вызванное такси из-за какого-нибудь бага или не купит в каком-нибудь онлайн магазине банку шпрот по цене ста банок, потому что мы добавили копейки к рублям как строку, без точки.
 -->
 
 ---
