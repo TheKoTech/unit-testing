@@ -57,7 +57,9 @@ layout: center
 
 В центр этой диаграммы мы никогда не попадём. Просто нет таких инструментов. Всегда придётся чем-то жертвовать.
 
-Интеграционные или сквозные тесты долгие, но покрывают кучу кода. Мы не мокаем ничего внутри самого проекта, он должен работать так же, как на проде, поэтому каждое действие в интеграционном тесте может затронуть с десяток файлов. Интеграционные тесты жертвуют временем.
+У этих трёх параметров есть крайние случаи, когда мы полностью отказываемся от чего-то одного.
+
+Откажемся от скорости - получим интеграционные или сквозные тесты. Зато покрывают кучу кода. Мы не мокаем ничего внутри самого проекта, он должен работать так же, как на проде, поэтому каждое действие в интеграционном тесте может затронуть с десяток файлов. Интеграционные тесты жертвуют временем.
 
 Хрупкие тесты - это тесты, которые ломаются на каждый чих. Если тест сломается, потому что мы переименовали тестируемый метод - тест хрупкий.
 
@@ -569,7 +571,7 @@ test(
 layout: center
 ```
 
-```ts {all|12-48|50-52|2-10|12-20|21-25|all}{lines:true,maxHeight:'500px'}
+```ts {all|12-48|50-52|all|58-60|58|59|12-20|14|20|2-10|22-25|12-48|all}{lines:true,maxHeight:'500px'}
 describe('should assign correct src path', () => {
   interface TestData {
     isDarkTheme?: boolean;
@@ -673,21 +675,645 @@ describe('should assign correct src path', () => {
 
 [click] а потом переиспользовать её для конкретных параметров
 
-[click] Итак. Сначала определяем, какие могут быть входные параметры. Все с вопросиками, всё опциональное.
+[click] Итак. Читаем тест. Читаем так, как если бы мы пришли сюда в первый раз. 
 
-[click] Те же параметры разворачиваем и определяем дефолтные.
-
-[click] setAppLinks ...
+[click] Скажем, вот этот тест упал. [click] "Для неправильной локали". Что для неправильной локали? 
 -->
 
 ---
+
+```yaml
 layout: center
+```
+
+```ts {all|9|9-14|16-17|18-25|all}{lines:true}
+describe('MapService', () => {
+  let service: MapService;
+  let http: jest.Mocked<HttpClient>;
+  let cache: jest.Mocked<AppCacheService>;
+  let map: any;
+
+  beforeEach(() => { /* ... */ });
+
+  it('Fetches data from API and saves to cache when cache is empty', (done) => {
+    // Arrange
+    const placeId = 123;
+    const apiResponse = [{ id: 'zone-1' }];
+    cache.get.mockReturnValue(null);
+    http.get.mockReturnValue(of(apiResponse));
+
+    // Act
+    service.getZones(placeId).subscribe((data) => {
+      // Assert
+      expect(data).toEqual(apiResponse);
+      expect(http.get).toHaveBeenCalledWith('/zones', {
+        params: new HttpParams().set('id', placeId),
+      });
+      expect(cache.set).toHaveBeenCalledWith(expect.any(String), { '123': apiResponse }, expect.any(Number));
+      done();
+    });
+  });
+});
+```
+
+<!--
+А теперь бойтесь. Это самый сложный тест на report-map, который я смог найти. Искал я, правда, поверхностно.
+
+Начинаем читать, без контекста. Сервис Карты, MapService [click] "Фетчит данные с АПИшки и кэширует их. Хорошо, довольно понятно.
+
+[click] Окей, создаём пару констант, мокируем получение кэша, т.е. cache.get, и апишку через http.get.
+
+[click] Получаем зоны по константе внутри теста.
+
+[click] Это RxJS, поэтому имеем вложенный assert. Нехорошо так делать, но rxjs это rxjs. Ага, проверяем, что апи вернёт то, что мы и ожидали. Проверяем, что API вызвали по такому-то пути с тем параметром, который нам и нужен для определения зон. И что в кэш записалось новое значение.
+
+[click] Как можно улучшить этот страшный, ужасно написанный тест?
+-->
+
 ---
+
+```yaml
+layout: center
+```
+
+```ts {80-104|all}{lines:true,maxHeight:'500px'}
+describe('shouldNotRequire', () => {
+  [
+    {
+      fields: [
+        {
+          code: 'name',
+          name: 'Имя',
+          isRequired: true,
+          isEditable: true,
+        },
+        {
+          code: 'surname',
+          name: 'Фамилия',
+          isRequired: true,
+          isEditable: true,
+        },
+        {
+          code: 'patronymic',
+          name: 'Отчество',
+          isRequired: true,
+          isEditable: true,
+        },
+      ],
+      shouldNotRequire: true,
+      testName: 'all',
+    },
+    {
+      fields: [
+        {
+          code: 'name',
+          name: 'Имя',
+          isRequired: false,
+          isEditable: true,
+        },
+        {
+          code: 'surname',
+          name: 'Фамилия',
+          isRequired: false,
+          isEditable: true,
+        },
+        {
+          code: 'patronymic',
+          name: 'Отчество',
+          isRequired: false,
+          isEditable: true,
+        },
+      ],
+      shouldNotRequire: false,
+      testName: 'all',
+    },
+    {
+      fields: [
+        {
+          code: 'name',
+          name: 'Имя',
+          isRequired: true,
+          isEditable: true,
+        },
+        {
+          code: 'surname',
+          name: 'Фамилия',
+          isRequired: false,
+          isEditable: true,
+        },
+        {
+          code: 'patronymic',
+          name: 'Отчество',
+          isRequired: false,
+          isEditable: true,
+        },
+      ],
+      shouldNotRequire: true,
+      testName: 'at least one',
+    },
+  ].forEach(({ fields, shouldNotRequire, testName }) => {
+    const mandatoryProfileField = getMockedMandatoryProfileField({
+      fields,
+    });
+
+    it(`returns ${shouldNotRequire} if ${testName} has isRequired ${shouldNotRequire}`, () => {
+      // act
+      const result = ProfileRequiredService.hasEmptyRequiredFields(
+        profile,
+        mandatoryProfileField
+      );
+
+      // assert
+      expect(result).toBe(shouldNotRequire);
+    });
+  });
+
+  it(`returns false if profile is not defined`, () => {
+    // arrange
+    const mandatoryProfileField = getMockedMandatoryProfileField();
+
+    // act
+    const result = ProfileRequiredService.hasEmptyRequiredFields(
+      null,
+      mandatoryProfileField
+    );
+
+    // assert
+    expect(result).toBeFalse();
+  });
+});
+```
+
+---
+
+```yaml
+layout: center
+```
+
+```ts
+[false, undefined].forEach((hint) => {
+  it(`should not display logo & hints when hasHint and hasLogo are ${hint}, detailHint is empty`, () => {
+    createComponent({
+      hasLogo: hint,
+      detailHint: '',
+      isEditable: true,
+    });
+
+    defineElements();
+    
+    expect(logoEl).not.toBeDefined();
+    expect(hintEl).toBeDefined();
+    expect(detailHintEl).not.toBeDefined();
+  });
+});
+```
+
+<!--
+-->
+
+---
+
+```ts {all}{lines:true,maxHeight:'480px'}
+type VisibleParamsTestCase = {
+  visibleParams: Pick<
+    NonNullable<Service['visibleParams']>,
+    'visibleType' | 'defaultVisibleType'
+  >;
+  expectedServicesLength: number;
+};
+
+const visibleParamsCases: VisibleParamsTestCase[] = [
+  {
+    visibleParams: {
+      visibleType: VisibleType.VISIBLE,
+      defaultVisibleType: VisibleType.HIDDEN,
+    },
+    expectedServicesLength: 1,
+  },
+  {
+    visibleParams: {
+      visibleType: VisibleType.HIDDEN,
+      defaultVisibleType: VisibleType.HIDDEN,
+    },
+    expectedServicesLength: 0,
+  },
+  {
+    visibleParams: {
+      visibleType: null,
+      defaultVisibleType: VisibleType.VISIBLE,
+    },
+    expectedServicesLength: 1,
+  },
+  {
+    visibleParams: {
+      visibleType: null,
+      defaultVisibleType: VisibleType.HIDDEN,
+    },
+    expectedServicesLength: 0,
+  },
+];
+
+visibleParamsCases.forEach(({ visibleParams, expectedServicesLength }) => {
+  it(`should be returned ${expectedServicesLength} services when visibleType is: ${visibleParams.visibleType}, defaultVisibleType is: ${visibleParams.defaultVisibleType}`, () => {
+    // arrange
+    const showingPlace = DetailShowingPlaces.ORDER_SCREEN;
+    const mockedServices = [
+      getMockedService({
+        showingPlace,
+        visible: false,
+        visibleParams: {
+          ...visibleParams,
+          params: null,
+          disableDescription: null,
+        },
+      }),
+    ];
+    const order = getMockedOrder({
+      tariff: [getMockedTariff({ services: mockedServices })],
+    });
+    initService();
+    // act
+    expectedServices = service.selectAllowedServices(order, [showingPlace]);
+    // assert
+    expect(expectedServices.length).toBe(expectedServicesLength);
+  });
+});
+```
+
+---
+
+```yaml
+layout: center
+```
+
+```ts
+//act
+// 1. Visit the website
+cy.visit('/');
+```
+
+---
+
+```yaml
+layout: center
+```
+
+```ts {all}{lines:true,maxHeight:'500px'}
+test(TestDescription.CREATE_HYGIENE, async ({ page }) => {
+  // arrange
+  const { faker, mainPage, dashboard, team, prDialog } = getPageObjects(page);
+  const mocks = PR_MOCKS[TestDescription.CREATE_HYGIENE]!;
+
+  await mockCommonNetworkPrOperations(faker, mocks);
+
+  const expectedGrade = PR_TYPE_LABELS[PrType.HYGIENE];
+  const expectedDateDue = '—';
+  const expectedStatus = 'Новый';
+  const expectedRequest: Partial<CreatePrRequest> = {
+    type: PrType.HYGIENE,
+    dateDue: '',
+    dateReview: '2077-07-07T00:00:00.000Z',
+  };
+  const httpWatcher = getHttpWatcher(
+    page,
+    '/api/reviews/profile/' + mocks.getProfileTeam![1].id!,
+    'POST'
+  );
+
+  await page.clock.setFixedTime(new Date(expectedRequest.dateReview!));
+
+  // act
+  await mainPage.navigate();
+  await dashboard.selectTeamMember(mocks.getProfileTeam![1].fullName!);
+
+  await expect(mainPage.alert).toBeHidden();
+
+  await prDialog.openCreateDialog();
+  await prDialog.fillHygieneCreateForm();
+
+  // check handle error
+  await faker.reviews.mockCreatePrApiError();
+  await prDialog.submitBtn.click();
+  await mainPage.checkApiErrorNotificationIsVisible();
+  await expect(
+    team.prListTable.filter({ hasText: 'Пока здесь пусто' })
+  ).toBeVisible();
+
+  await faker.reviews.mockProfileReviews({ post: { params: mocks.createPr } });
+
+  await prDialog.submitForm();
+
+  const response = await httpWatcher;
+
+  // assert
+  expect(response.request().postDataJSON()).toMatchObject(expectedRequest);
+  await Promise.all([
+    mainPage.checkNotificationIsVisible('Performance Review добавлен'),
+    expect(
+      team.prListTable.getByRole('row', {
+        name: `${expectedGrade} ${expectedDateDue} ${expectedStatus}`,
+      })
+    ).toBeVisible(),
+  ]);
+});
+```
+
+---
+
+```yaml
+layout: center
+```
+
+```ts {all}{lines:true,maxHeight:'500px'}
+test(
+  OrderDescription.CREATE_ORDER_WITH_UNKNOWN_ERROR,
+  async ({ page, faker, storage }) => {
+    // arrange
+    const base = getBaseMock({
+      id: 100,
+    });
+
+    // arrange: network
+    await faker.bases.mock({
+      get: { params: mocks.getBases },
+    });
+    await faker.auth.mock({ post: { params: mocks.auth } });
+    await faker.featureToggles.mock({
+      get: { params: mocks.featureToggles },
+    });
+    await faker.fillingSettings.mock({
+      get: { params: mocks.getFillingSettings },
+    });
+    await faker.profile.mock({ get: { params: mocks.getProfile } });
+    await faker.addressesByCoordinates.mock({
+      get: { params: mocks.getAddressesByCoordinates },
+    });
+    await faker.tariffCategories.mock({
+      get: { params: mocks.getTariffCategories },
+    });
+    await faker.tariffTypes.mock({
+      get: { params: mocks.getTariffTypes },
+    });
+    await faker.patterns.mock({
+      get: { params: mocks.getPatterns },
+    });
+    await faker.meetpoints.mock({
+      get: { params: mocks.getMeetpoints },
+    });
+    await faker.addresses.mock({
+      get: { params: mocks.getAddresses },
+    });
+    await faker.calculate.mock({
+      post: { params: mocks.calculate },
+    });
+    await faker.orders.mock({
+      post: { fulfillParams: { status: 500 } },
+      get: { params: mocks.getOrders },
+    });
+
+    const waitForOrder = page.waitForRequest((req) => {
+      return (
+        req.url().startsWith('https://dev-mos.taximaxim.ru/orders') &&
+        req.method() === 'POST'
+      );
+    });
+
+    // arrange: storage
+    await storage.predefine([{ key: StorageKey.BASE, value: base }]);
+
+    // act
+    await page.goto('/');
+
+    await page.getByRole('button').filter({ hasText: 'Куда поедете' }).click();
+    await page.getByPlaceholder('Введите адрес для поиска').fill('Пушкина');
+    await page
+      .getByRole('listitem')
+      .filter({ hasText: addressList[2].title! })
+      .click();
+    await page.getByRole('button').filter({ hasText: 'Заказать' }).click();
+    await waitForOrder;
+
+    // assert
+    const resultDialog = page
+      .getByRole('dialog')
+      .filter({ hasText: 'Ошибка' })
+      .filter({ hasText: 'Свяжитесь с оператором или попробуйте позже' });
+
+    await expect(
+      resultDialog.getByRole('button').filter({ hasText: 'Вернуться в чат' })
+    ).toBeVisible();
+  }
+);
+```
+
+---
+
+```yaml
+layout: center
+```
+
+```ts {all}{lines:true,maxHeight:'500px'}
+test(
+  OrderDescription.CREATE_ORDER_WITH_UNKNOWN_ERROR,
+  async ({ page, faker, storage }) => {
+    // arrange
+    const base = getBaseMock({
+      id: 100,
+    });
+
+    // arrange: network
+    await justMockEverything(mocks[OrderDescription.CREATE_ORDER_WITH_UNKNOWN_ERROR])
+    
+    const waitForOrder = page.waitForRequest((req) => {
+      return (
+        req.url().startsWith('https://dev-mos.taximaxim.ru/orders') &&
+        req.method() === 'POST'
+      );
+    });
+
+    // arrange: storage
+    await storage.predefine([{ key: StorageKey.BASE, value: base }]);
+
+    // act
+    await page.goto('/');
+
+    await page.getByRole('button').filter({ hasText: 'Куда поедете' }).click();
+    await page.getByPlaceholder('Введите адрес для поиска').fill('Пушкина');
+    await page
+      .getByRole('listitem')
+      .filter({ hasText: addressList[2].title! })
+      .click();
+    await page.getByRole('button').filter({ hasText: 'Заказать' }).click();
+    await waitForOrder;
+
+    // assert
+    const resultDialog = page
+      .getByRole('dialog')
+      .filter({ hasText: 'Ошибка' })
+      .filter({ hasText: 'Свяжитесь с оператором или попробуйте позже' });
+
+    await expect(
+      resultDialog.getByRole('button').filter({ hasText: 'Вернуться в чат' })
+    ).toBeVisible();
+  }
+);
+```
+
+---
+
+```yaml
+layout: center
+```
+
+````md magic-move {lines:true}
+```ts {all|8-11}
+it('should show icon when collapsed', () => {
+  // arrange
+  initComponent({ isCollapsed: true });
+
+  // act
+  fixture.detectChanges();
+
+  // assert
+  const icon = fixture.debugElement.query(
+    By.css('[data-testid="badge-collapse-button__icon"]')
+  );
+
+  expect(icon).toBeDefined();
+});
+```
+
+```ts {all|10-13}
+import { getDebugElementByTestId } from '...';
+
+it('should show icon when collapsed', () => {
+  // arrange
+  initComponent({ isCollapsed: true });
+
+  // act
+  fixture.detectChanges();
+
+  // assert
+  const icon = getDebugElementByTestId(
+    'badge-collapse-button__icon'
+  )
+
+  expect(icon).toBeDefined();
+});
+```
+
+```ts {all|5-9}
+describe('should assign correct src path', () => {
+  interface TestData { ... }
+
+  function test({ ... }: TestData): void {
+    // arrange
+    setAppLinks({
+      appLinks: { [actualStore]: '' },
+      region: isCrimea ? AppLinkRegion.CRIMEA : AppLinkRegion.GLOBAL,
+    });
+    const actual: Badge[][] = [];
+    const appConfig: Partial<AppConfig> = { locale: 'ru', localeIr: 'ir' };
+
+    TestBed.overrideProvider(LOCALE_ID, { useValue: actualLocale });
+    TestBed.overrideProvider(APP_CONFIG_TOKEN, { useValue: appConfig });
+    TestBed.overrideProvider(IS_DARK_THEME$, { useValue: of(isDarkTheme) });
+
+    // ...
+  }
+})
+```
+
+```ts {all}
+describe('should assign correct src path', () => {
+  interface TestData { ... }
+
+  function test({ ... }: TestData): void {
+    // arrange
+    setAppLinks({
+      appLinks: { [actualStore]: '' },
+      region: isCrimea ? AppLinkRegion.CRIMEA : AppLinkRegion.GLOBAL,
+    });
+    const actual: Badge[][] = [];
+    const appConfig: Partial<AppConfig> = { locale: 'ru', localeIr: 'ir' };
+
+    TestBed.overrideProvider(LOCALE_ID, { useValue: actualLocale });
+    TestBed.overrideProvider(APP_CONFIG_TOKEN, { useValue: appConfig });
+    TestBed.overrideProvider(IS_DARK_THEME$, { useValue: of(isDarkTheme) });
+
+    // ...
+  }
+})
+```
+````
+
+---
+
+```yaml
+layout: center
+```
+
+```ts {*}{lines:true,maxHeight:'500px'}
+it('Forwards arguments for update destination address', () => {
+  // Arrange
+  const mockInput = {
+    pointIndex: 1,
+    comment: 'testComment',
+    source: OrderParamsSource.FORM,
+  };
+
+  const mockOrder = getMockedOrder({
+    addressTo: [
+      getMockedAddress({
+        title: 'Mocked address 1',
+        isFull: true,
+        latitude: 55.444729,
+        longitude: 65.342224,
+        place: {
+          id: 1,
+          name: 'Курган',
+          description: '',
+          hasAddresses: null,
+        },
+        comment: mockInput.comment,
+      }),
+    ],
+  });
+
+  storeSpy.selectSnapshot
+    .withArgs(AppSelectors.order)
+    .and.returnValue(mockOrder);
+
+  // Act
+  service.setMeetingPoint(
+    mockInput.comment,
+    mockInput.pointIndex,
+    mockInput.source
+  );
+
+  // Assert
+  expect(storeSpy.dispatch).toHaveBeenCalledWith(
+    new OrderAddressServiceActions.AddressTo.Update.WhenMeetingPointUpdated(
+      {
+        params: {
+          addressTo: mockOrder.addressTo,
+        },
+        source: mockInput.source,
+      }
+    )
+  );
+});
+```
+
+---
+
+```yaml
+layout: center
+```
 
 <h1 class="text-green-400">AAAAAAAAAA</h1>
 
 ````md magic-move {lines:true}
-// step 1
 ```ts {*|2-7|9-10|12-13|*} twoslash
 it('Purchase succeeds when enough inventory', () => {
   // Arrange
@@ -705,7 +1331,6 @@ it('Purchase succeeds when enough inventory', () => {
 })
 ```
 
-// step 2
 ```ts {*} twoslash
 it('Purchase succeeds when enough inventory', () => {
   const apiServiceMock = {
@@ -720,7 +1345,6 @@ it('Purchase succeeds when enough inventory', () => {
 })
 ```
 
-// step 3
 ```ts {*|11-|*} twoslash
 it('Purchase succeeds when enough inventory', () => {
   // Arrange
@@ -746,7 +1370,6 @@ it('Purchase succeeds when enough inventory', () => {
 })
 ```
 
-// step 4
 ```ts {*|14-19|*} twoslash
 it('Purchase succeeds when enough inventory', () => {
   // Arrange
@@ -770,7 +1393,6 @@ it('Purchase succeeds when enough inventory', () => {
 })
 ```
 
-// step 5
 ```ts {*} twoslash
 it('Purchase succeeds when enough inventory', () => {
   const apiServiceMock = {
@@ -797,7 +1419,6 @@ it("Purchase fails when not enough inventory", () => {
 })
 ```
 
-// step 6
 ```ts {*|2-7} twoslash
 it('Purchase succeeds when enough inventory', () => {
   // Arrange
